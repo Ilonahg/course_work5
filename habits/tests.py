@@ -9,7 +9,19 @@ User = get_user_model()
 
 
 class HabitTests(APITestCase):
+    """
+    Набор тестов для проверки CRUD-функционала модели Habit.
+
+    Проверяются:
+    - создание привычки;
+    - получение списка привычек (с пагинацией);
+    - обновление привычки;
+    - удаление привычки;
+    - строковое представление модели.
+    """
+
     def setUp(self):
+        """Создаёт тестового пользователя и аутентифицирует его."""
         self.user = User.objects.create_user(
             email="test@example.com",
             username="testuser",
@@ -19,26 +31,26 @@ class HabitTests(APITestCase):
         self.habit_url = reverse("habit-list")
 
     def test_create_habit(self):
-        """Проверка создания привычки"""
+        """Проверяет создание новой привычки пользователем."""
         data = {
             "action": "Пить воду",
             "place": "Дом",
             "time": "08:00:00",
-            "time_to_complete": "00:01:30",  # строка — сериализатор сам преобразует
+            "time_to_complete": "00:01:30",
             "is_pleasant": False,
             "is_public": True,
-            "periodicity": "Ежедневно",
+            "periodicity": 1,  # теперь числовое поле (дни)
         }
         response = self.client.post(self.habit_url, data, format="json")
 
-        if response.status_code != 201:
+        if response.status_code != status.HTTP_201_CREATED:
             print("\nОшибка при создании:", response.data)
 
-        self.assertIn(response.status_code, [status.HTTP_201_CREATED, status.HTTP_200_OK])
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(Habit.objects.exists())
 
     def test_get_habits_list(self):
-        """Проверка получения списка привычек"""
+        """Проверяет получение списка привычек (учитывая пагинацию)."""
         Habit.objects.create(
             user=self.user,
             action="Бегать",
@@ -46,15 +58,16 @@ class HabitTests(APITestCase):
             time="07:00:00",
             time_to_complete=timedelta(minutes=2),
         )
+
         response = self.client.get(self.habit_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # учёт пагинации
+        # Проверяем наличие результатов
         results = response.data.get("results", response.data)
         self.assertGreaterEqual(len(results), 1)
 
     def test_update_habit(self):
-        """Проверка обновления привычки"""
+        """Проверяет возможность обновления привычки."""
         habit = Habit.objects.create(
             user=self.user,
             action="Читать книги",
@@ -64,9 +77,10 @@ class HabitTests(APITestCase):
         )
         url = reverse("habit-detail", args=[habit.id])
         data = {"action": "Читать 10 страниц"}
+
         response = self.client.patch(url, data, format="json")
 
-        if response.status_code != 200:
+        if response.status_code != status.HTTP_200_OK:
             print("\nОшибка при обновлении:", response.data)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -74,7 +88,7 @@ class HabitTests(APITestCase):
         self.assertEqual(habit.action, "Читать 10 страниц")
 
     def test_delete_habit(self):
-        """Проверка удаления привычки"""
+        """Проверяет удаление привычки пользователем."""
         habit = Habit.objects.create(
             user=self.user,
             action="Медитировать",
@@ -83,20 +97,24 @@ class HabitTests(APITestCase):
             time_to_complete=timedelta(minutes=1),
         )
         url = reverse("habit-detail", args=[habit.id])
+
         response = self.client.delete(url)
 
-        if response.status_code != 204:
+        if response.status_code != status.HTTP_204_NO_CONTENT:
             print("\nОшибка при удалении:", response.data)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Habit.objects.filter(id=habit.id).exists())
-def test_habit_str(self):
-    """Проверка строкового представления привычки"""
-    habit = Habit.objects.create(
-        user=self.user,
-        action="Тестовое действие",
-        place="Офис",
-        time="09:00:00",
-        time_to_complete=timedelta(minutes=1),
-    )
-    self.assertEqual(str(habit), "Тестовое действие")
+
+    def test_habit_str(self):
+        """Проверяет строковое представление модели Habit."""
+        habit = Habit.objects.create(
+            user=self.user,
+            action="Тестовое действие",
+            place="Офис",
+            time="09:00:00",
+            time_to_complete=timedelta(minutes=1),
+        )
+
+        expected_str = f"{habit.action} ({habit.user})"
+        self.assertEqual(str(habit), expected_str)
